@@ -26,6 +26,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "pnpm exec next dev -p 3100",
+    env: { FORMSPREE_FORM_ID: "test-form-id" },
     url: "http://127.0.0.1:3100",
     reuseExistingServer: !process.env.CI,
   },

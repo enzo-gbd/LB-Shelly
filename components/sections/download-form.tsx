@@ -40,12 +40,6 @@ const fields = [
 type FormErrors = Partial<Record<DownloadFieldName, string | undefined>>;
 type SubmissionStatus = "idle" | "loading" | "success" | "error";
 
-type LeadApiResponse = {
-  success?: boolean;
-  message?: string;
-  fieldErrors?: FormErrors;
-};
-
 function triggerDownload() {
   const link = document.createElement("a");
   link.href = "/livre-blanc-shelly-sarkar.pdf";
@@ -55,7 +49,11 @@ function triggerDownload() {
   link.remove();
 }
 
-export function DownloadForm() {
+type DownloadFormProps = {
+  formId: string;
+};
+
+export function DownloadForm({ formId }: DownloadFormProps) {
   const [errors, setErrors] = useState<FormErrors>({});
   const [status, setStatus] = useState<SubmissionStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
@@ -77,7 +75,7 @@ export function DownloadForm() {
       profession: formData.get("profession"),
       email: formData.get("email"),
       marketingConsent: formData.get("marketingConsent") === "on",
-      website: formData.get("website"),
+      _gotcha: formData.get("_gotcha"),
     });
 
     if (!result.success) {
@@ -95,18 +93,33 @@ export function DownloadForm() {
     setStatusMessage("Envoi sécurisé en cours…");
 
     try {
-      const response = await fetch("/api/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result.data),
-      });
-      const body = (await response.json().catch(() => null)) as LeadApiResponse | null;
+      const normalizedFormId = formId.trim();
 
-      if (!response.ok || !body?.success) {
-        if (body?.fieldErrors) {
-          setErrors(body.fieldErrors);
-        }
-        throw new Error("Lead API request failed.");
+      if (!normalizedFormId) {
+        throw new Error("Missing Formspree form ID.");
+      }
+
+      const response = await fetch(
+        `https://formspree.io/f/${encodeURIComponent(normalizedFormId)}`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            firstName: result.data.firstName,
+            lastName: result.data.lastName,
+            profession: result.data.profession,
+            email: result.data.email,
+            marketingConsent: result.data.marketingConsent ? "Oui" : "Non",
+            _gotcha: result.data._gotcha,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Formspree request failed.");
       }
 
       setStatus("success");
@@ -116,7 +129,7 @@ export function DownloadForm() {
     } catch {
       setStatus("error");
       setStatusMessage(
-        "L’envoi n’a pas abouti. Vos informations sont conservées : veuillez réessayer.",
+        "Une erreur est survenue lors de l’envoi. Vérifiez votre connexion et réessayez.",
       );
     }
   }
@@ -167,10 +180,10 @@ export function DownloadForm() {
                 aria-hidden="true"
                 className="pointer-events-none absolute -left-[9999px] h-px w-px overflow-hidden opacity-0"
               >
-                <label htmlFor="website">Site internet</label>
+                <label htmlFor="_gotcha">Site internet</label>
                 <input
-                  id="website"
-                  name="website"
+                  id="_gotcha"
+                  name="_gotcha"
                   type="text"
                   autoComplete="off"
                   tabIndex={-1}

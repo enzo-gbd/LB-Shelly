@@ -9,6 +9,8 @@ import { StudyPreview } from "@/components/sections/study-preview";
 import { TensionSection } from "@/components/sections/tension-section";
 
 export default function Home() {
+  const formspreeFormId = process.env.FORMSPREE_FORM_ID ?? "";
+
   return (
     <main>
       <Hero />
@@ -18,7 +20,7 @@ export default function Home() {
       <StudyPreview />
       <DocumentPreview />
       <AuthorSection />
-      <DownloadForm />
+      <DownloadForm formId={formspreeFormId} />
       <Footer />
     </main>
   );

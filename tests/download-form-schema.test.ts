@@ -38,6 +38,6 @@ describe("download form schema", () => {
     const result = downloadFormSchema.parse(validFields);
     expect(result.email).toBe("camille@gmail.com");
     expect(result.marketingConsent).toBe(false);
-    expect(result.website).toBe("");
+    expect(result._gotcha).toBe("");
   });
 });

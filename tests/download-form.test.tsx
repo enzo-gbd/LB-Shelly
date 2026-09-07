@@ -8,7 +8,6 @@ vi.mock("@/lib/client-analytics", () => ({ trackClientEvent: vi.fn() }));
 
 const successfulResponse = {
   ok: true,
-  json: async () => ({ success: true }),
 };
 
 async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
@@ -21,17 +20,22 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
   );
 }
 
+function renderForm() {
+  return render(<DownloadForm formId="test-form-id" />);
+}
+
 describe("download form", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("announces empty-field errors and focuses the first invalid field", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    render(<DownloadForm />);
+    renderForm();
 
     await user.click(screen.getByRole("button", { name: /télécharger le livre blanc/i }));
 
@@ -53,7 +57,7 @@ describe("download form", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    render(<DownloadForm />);
+    renderForm();
     await fillRequiredFields(user);
 
     await user.click(screen.getByRole("button", { name: /télécharger le livre blanc/i }));
@@ -61,30 +65,33 @@ describe("download form", () => {
     const loadingButton = screen.getByRole("button", { name: /envoi en cours/i });
     expect(loadingButton).toBeDisabled();
     expect(loadingButton.closest("form")).toHaveAttribute("aria-busy", "true");
+    await user.click(loadingButton);
+    expect(fetchMock).toHaveBeenCalledOnce();
 
     resolveRequest?.(successfulResponse);
     await waitFor(() => expect(screen.getByRole("status")).toBeVisible());
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it("keeps values and permits a retry when the API fails", async () => {
+  it("keeps values and permits a retry when Formspree returns an HTTP error", async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: false,
-        json: async () => ({ success: false }),
       }),
     );
     const click = vi
       .spyOn(HTMLAnchorElement.prototype, "click")
       .mockImplementation(() => {});
-    render(<DownloadForm />);
+    renderForm();
     await fillRequiredFields(user);
 
     await user.click(screen.getByRole("button", { name: /télécharger le livre blanc/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("L’envoi n’a pas abouti");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Une erreur est survenue lors de l’envoi",
+    );
     expect(screen.getByLabelText("Prénom")).toHaveValue("Camille");
     expect(
       screen.getByRole("button", { name: /télécharger le livre blanc/i }),
@@ -92,14 +99,31 @@ describe("download form", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
-  it("downloads after server success without requiring marketing consent", async () => {
+  it("does not download after a network error", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Network error")));
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    renderForm();
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /télécharger le livre blanc/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Vérifiez votre connexion et réessayez",
+    );
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it("downloads after Formspree success without requiring marketing consent", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue(successfulResponse);
     vi.stubGlobal("fetch", fetchMock);
     const click = vi
       .spyOn(HTMLAnchorElement.prototype, "click")
       .mockImplementation(() => {});
-    render(<DownloadForm />);
+    renderForm();
     await fillRequiredFields(user);
 
     expect(screen.getByLabelText(/j’accepte de recevoir/i)).not.toBeChecked();
@@ -113,11 +137,32 @@ describe("download form", () => {
       "/livre-blanc-shelly-sarkar.pdf",
     );
     expect(click).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://formspree.io/f/test-form-id",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      }),
+    );
     const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(JSON.parse(String(request.body))).toMatchObject({
+      firstName: "Camille",
+      lastName: "Martin",
+      profession: "Planneuse stratégique",
       email: "camille@example.com",
-      marketingConsent: false,
-      website: "",
+      marketingConsent: "Non",
+      _gotcha: "",
     });
+  });
+
+  it("uses Formspree’s compatible honeypot field", () => {
+    const { container } = renderForm();
+    const honeypot = container.querySelector<HTMLInputElement>('input[name="_gotcha"]');
+
+    expect(honeypot).toHaveAttribute("tabindex", "-1");
+    expect(honeypot?.closest('[aria-hidden="true"]')).not.toBeNull();
   });
 });

@@ -16,7 +16,7 @@ test("presents the editorial narrative and downloads through the form", async ({
 }) => {
   const browserErrors = collectBrowserErrors(page);
   let submittedLead: Record<string, unknown> | undefined;
-  await page.route("**/api/leads", async (route) => {
+  await page.route("https://formspree.io/f/test-form-id", async (route) => {
     submittedLead = route.request().postDataJSON() as Record<string, unknown>;
     await route.fulfill({
       status: 200,
@@ -60,7 +60,7 @@ test("presents the editorial narrative and downloads through the form", async ({
   expect(submittedLead).toMatchObject({
     firstName: "Camille",
     email: "camille@example.com",
-    marketingConsent: false,
+    marketingConsent: "Non",
   });
   expect(browserErrors).toEqual([]);
 });

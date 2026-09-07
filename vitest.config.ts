@@ -17,12 +17,10 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html"],
       include: [
-        "app/api/leads/route.ts",
         "components/ui/cta.tsx",
         "components/ui/section-heading.tsx",
         "components/sections/download-form.tsx",
         "lib/download-form-schema.ts",
-        "lib/send-lead-email.ts",
       ],
       thresholds: {
         lines: 80,

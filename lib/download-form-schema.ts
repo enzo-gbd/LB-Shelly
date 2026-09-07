@@ -14,14 +14,14 @@ export const downloadFormSchema = z
       .max(320, "Saisissez une adresse e-mail valide.")
       .email("Saisissez une adresse e-mail valide."),
     marketingConsent: z.boolean().optional().default(false),
-    website: z.string().trim().max(200).optional().default(""),
+    _gotcha: z.string().trim().max(200).optional().default(""),
   })
   .strict();
 
 export type DownloadFormValues = z.infer<typeof downloadFormSchema>;
 export type DownloadFieldName = Exclude<
   keyof DownloadFormValues,
-  "marketingConsent" | "website"
+  "marketingConsent" | "_gotcha"
 >;
 
 export function getDownloadFormErrors(error: z.ZodError<DownloadFormValues>) {
